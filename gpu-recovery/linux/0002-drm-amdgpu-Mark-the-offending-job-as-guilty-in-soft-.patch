@@ -1,0 +1,32 @@
+From 1d598f204f1b5efa80232e98165e44e09690bb72 Mon Sep 17 00:00:00 2001
+From: Tatsuyuki Ishi <ishitatsuyuki@gmail.com>
+Date: Tue, 29 Jun 2021 19:30:35 +0900
+Subject: [PATCH 2/2] drm/amdgpu: Mark the offending job as guilty in soft
+ recovery
+
+Previously a soft recovery would mark no job as guilty, while a hard reset
+did. This patch aligns the behavior between the two.
+
+Clients using GL_KHR_robustness will now receive GUILTY_CONTEXT_RESET in
+case it's expected.
+
+Signed-off-by: Tatsuyuki Ishi <ishitatsuyuki@gmail.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_job.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
+index be1971686d31..a078dfaac1df 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
+@@ -41,6 +41,7 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
+ 	    amdgpu_ring_soft_recovery(ring, job->vmid, s_job->s_fence->parent)) {
+ 		DRM_ERROR("ring %s timeout, but soft recovered\n",
+ 			  s_job->sched->name);
++		drm_sched_increase_karma(s_job);
+ 		dma_fence_set_error(&s_job->s_fence->finished, -ECANCELED);
+ 		return DRM_GPU_SCHED_STAT_NOMINAL;
+ 	}
+-- 
+2.32.0
+

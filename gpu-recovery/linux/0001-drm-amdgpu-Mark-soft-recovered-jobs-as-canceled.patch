@@ -1,0 +1,40 @@
+From 8e6a1601f962a35faa4807c18d9feb86d6d200f6 Mon Sep 17 00:00:00 2001
+From: Tatsuyuki Ishi <ishitatsuyuki@gmail.com>
+Date: Tue, 29 Jun 2021 19:26:23 +0900
+Subject: [PATCH 1/2] drm/amdgpu: Mark soft recovered jobs as canceled
+
+Previously when a soft recovery occurs, the application is not notified of
+that. With this change the offending application will receive an error.
+
+RADV clients will now get VK_ERROR_DEVICE_LOST if their jobs time out.
+Previously, such errors would have been swallowed. As a canceled job might
+violate potential invariants in application code, the behavior change with
+this patch is deemed reasonable. If there are applications that relies on
+swallowing error (e.g. apps which submits malformed commands), then it
+might make sense to make this behavior opt-in.
+
+Reset events are opt-in for OpenGL and this does not change the behavior
+of radeonsi clients. All applications receive a reset notification
+(through amdgpu_cs_query_reset_state2) regardless of being the offender or
+not. This behavior could be improved in the future.
+
+Signed-off-by: Tatsuyuki Ishi <ishitatsuyuki@gmail.com>
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_job.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
+index 759b34799221..be1971686d31 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_job.c
+@@ -41,6 +41,7 @@ static enum drm_gpu_sched_stat amdgpu_job_timedout(struct drm_sched_job *s_job)
+ 	    amdgpu_ring_soft_recovery(ring, job->vmid, s_job->s_fence->parent)) {
+ 		DRM_ERROR("ring %s timeout, but soft recovered\n",
+ 			  s_job->sched->name);
++		dma_fence_set_error(&s_job->s_fence->finished, -ECANCELED);
+ 		return DRM_GPU_SCHED_STAT_NOMINAL;
+ 	}
+ 
+-- 
+2.32.0
+

@@ -1,0 +1,28 @@
+From 20a7a292a7c795fe639074b65de5923ec64734a5 Mon Sep 17 00:00:00 2001
+From: Tatsuyuki Ishi <ishitatsuyuki@gmail.com>
+Date: Tue, 29 Jun 2021 19:49:33 +0900
+Subject: [PATCH] si: ignore non-critical reset notifications
+
+Previously the application would be notified of a soft recovery even
+though no action was required on the application's side. Suppress it to
+avoid redundant context recreations.
+---
+ src/gallium/drivers/radeonsi/si_pipe.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gallium/drivers/radeonsi/si_pipe.c b/src/gallium/drivers/radeonsi/si_pipe.c
+index 95b4a71873e..39861dd4333 100644
+--- a/src/gallium/drivers/radeonsi/si_pipe.c
++++ b/src/gallium/drivers/radeonsi/si_pipe.c
+@@ -342,7 +342,7 @@ static enum pipe_reset_status si_get_reset_status(struct pipe_context *ctx)
+       return PIPE_NO_RESET;
+ 
+    bool needs_reset;
+-   enum pipe_reset_status status = sctx->ws->ctx_query_reset_status(sctx->ctx, false, &needs_reset);
++   enum pipe_reset_status status = sctx->ws->ctx_query_reset_status(sctx->ctx, true, &needs_reset);
+ 
+    if (status != PIPE_NO_RESET && needs_reset && !(sctx->context_flags & SI_CONTEXT_FLAG_AUX)) {
+       /* Call the gallium frontend to set a no-op API dispatch. */
+-- 
+2.32.0
+
