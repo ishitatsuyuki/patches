@@ -1,13 +1,15 @@
 From ae3b752684f918ef3dc39cb71c948869ddc32449 Mon Sep 17 00:00:00 2001
 From: Tatsuyuki Ishi <ishitatsuyuki@gmail.com>
 Date: Mon, 6 Dec 2021 11:13:02 +0900
-Subject: [PATCH] drm: make drm_syncobj_array_wait() use the range hrtimer
+Subject: [PATCH v2] drm: make drm_syncobj_array_wait() use the range hrtimer
  feature
 
 select(), poll() and epoll_wait() all already supports high-precision
 timeout handling. This patch makes drm_syncobj_array_wait() to handle
 the timeout in high precision using the same heuristics and functions
 implemented for select().
+
+v2: Fix a name error resulting in NULL dereference.
 
 Signed-off-by: Tatsuyuki Ishi <ishitatsuyuki@gmail.com>
 ---
@@ -147,7 +149,7 @@ index c9a9d74f338c..b2f1631e7dc2 100644
 -							 timeout, &first);
 -		if (timeout < 0)
 -			return timeout;
-+		timeout = ns_to_timespec64(wait->timeout_nsec);
++		timeout = ns_to_timespec64(timeline_wait->timeout_nsec);
 +		ret = drm_syncobj_array_wait_timeout(
 +			syncobjs, u64_to_user_ptr(timeline_wait->points),
 +			timeline_wait->count_handles, timeline_wait->flags,
