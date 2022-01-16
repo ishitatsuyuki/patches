@@ -1,7 +1,7 @@
-From ae3b752684f918ef3dc39cb71c948869ddc32449 Mon Sep 17 00:00:00 2001
+From 2c748ef13ddcfc618f06db9f79b030a6472be482 Mon Sep 17 00:00:00 2001
 From: Tatsuyuki Ishi <ishitatsuyuki@gmail.com>
-Date: Mon, 6 Dec 2021 11:13:02 +0900
-Subject: [PATCH v2] drm: make drm_syncobj_array_wait() use the range hrtimer
+Date: Sun, 16 Jan 2022 22:40:49 +0900
+Subject: [PATCH v3] drm: make drm_syncobj_array_wait() use the range hrtimer
  feature
 
 select(), poll() and epoll_wait() all already supports high-precision
@@ -10,17 +10,19 @@ the timeout in high precision using the same heuristics and functions
 implemented for select().
 
 v2: Fix a name error resulting in NULL dereference.
+v3: Export select_estimate_accuracy to fix validation errors.
 
 Signed-off-by: Tatsuyuki Ishi <ishitatsuyuki@gmail.com>
 ---
  drivers/gpu/drm/drm_syncobj.c | 75 ++++++++++++++++++++---------------
- 1 file changed, 44 insertions(+), 31 deletions(-)
+ fs/select.c                   |  1 +
+ 2 files changed, 45 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/gpu/drm/drm_syncobj.c b/drivers/gpu/drm/drm_syncobj.c
-index c9a9d74f338c..b2f1631e7dc2 100644
+index c313a5b4549c..ba87025844a8 100644
 --- a/drivers/gpu/drm/drm_syncobj.c
 +++ b/drivers/gpu/drm/drm_syncobj.c
-@@ -949,17 +949,30 @@ static void syncobj_wait_syncobj_func(struct drm_syncobj *syncobj,
+@@ -958,17 +958,30 @@ static void syncobj_wait_syncobj_func(struct drm_syncobj *syncobj,
  	list_del_init(&wait->node);
  }
  
@@ -57,7 +59,7 @@ index c9a9d74f338c..b2f1631e7dc2 100644
  
  	if (flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT)
  		lockdep_assert_none_held_once();
-@@ -973,13 +986,13 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
+@@ -982,13 +995,13 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
  
  	} else if (copy_from_user(points, user_points,
  				  sizeof(uint64_t) * count)) {
@@ -73,7 +75,7 @@ index c9a9d74f338c..b2f1631e7dc2 100644
  		goto err_free_points;
  	}
  	/* Walk the list of sync objects and initialize entries.  We do
-@@ -999,7 +1012,7 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
+@@ -1008,7 +1021,7 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
  			if (flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT) {
  				continue;
  			} else {
@@ -82,7 +84,7 @@ index c9a9d74f338c..b2f1631e7dc2 100644
  				goto cleanup_entries;
  			}
  		}
-@@ -1063,17 +1076,18 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
+@@ -1072,17 +1085,18 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
  		if (signaled_count == count)
  			goto done_waiting;
  
@@ -105,7 +107,7 @@ index c9a9d74f338c..b2f1631e7dc2 100644
  	} while (1);
  
  done_waiting:
-@@ -1092,7 +1106,7 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
+@@ -1101,7 +1115,7 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
  err_free_points:
  	kfree(points);
  
@@ -114,7 +116,7 @@ index c9a9d74f338c..b2f1631e7dc2 100644
  }
  
  /**
-@@ -1134,28 +1148,27 @@ static int drm_syncobj_array_wait(struct drm_device *dev,
+@@ -1143,28 +1157,27 @@ static int drm_syncobj_array_wait(struct drm_device *dev,
  				  struct drm_syncobj_timeline_wait *timeline_wait,
  				  struct drm_syncobj **syncobjs, bool timeline)
  {
@@ -159,6 +161,18 @@ index c9a9d74f338c..b2f1631e7dc2 100644
  		timeline_wait->first_signaled = first;
  	}
  	return 0;
+diff --git a/fs/select.c b/fs/select.c
+index 945896d0ac9e..3410f7d07b49 100644
+--- a/fs/select.c
++++ b/fs/select.c
+@@ -91,6 +91,7 @@ u64 select_estimate_accuracy(struct timespec64 *tv)
+ 		return current->timer_slack_ns;
+ 	return ret;
+ }
++EXPORT_SYMBOL(select_estimate_accuracy);
+ 
+ 
+ 
 -- 
 2.34.1
 
